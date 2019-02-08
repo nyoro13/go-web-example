@@ -1,7 +1,12 @@
 package main
 
-import "fmt"
+import (
+	"go-web-example/weblog"
+)
 
 func main() {
-	fmt.Println("go web example")
+	logger := weblog.NewDefaultLogger("go-web-example")
+	logger.Debug("Hello")
+	logger.Warn("World")
+	logger.Error("!!!")
 }
