@@ -1,12 +1,17 @@
 package main
 
 import (
-	"go-web-example/log"
+	slog "go-web-example/server/log"
+	"log"
+	"net/http"
 )
 
 func main() {
-	log.SetStdLogger("go-web-example")
-	log.Debug("hello")
-	log.Warn("world")
-	log.Error("!!!")
+	slog.SetStdLogger("GoWebExample")
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		slog.Debug("RequestURI: %v", r.RequestURI)
+		w.Write([]byte(r.RequestURI))
+	})
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
