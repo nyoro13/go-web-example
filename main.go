@@ -1,12 +1,12 @@
 package main
 
 import (
-	"go-web-example/weblog"
+	"go-web-example/log"
 )
 
 func main() {
-	logger := weblog.NewDefaultLogger("go-web-example")
-	logger.Debug("Hello")
-	logger.Warn("World")
-	logger.Error("!!!")
+	log.SetStdLogger("go-web-example")
+	log.Debug("hello")
+	log.Warn("world")
+	log.Error("!!!")
 }
