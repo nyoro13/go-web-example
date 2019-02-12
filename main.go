@@ -1,17 +1,23 @@
 package main
 
 import (
-	slog "go-web-example/server/log"
-	"log"
+	"go-web-example/server/handler"
+	"go-web-example/server"
+	"go-web-example/server/log"
 	"net/http"
 )
 
 func main() {
-	slog.SetStdLogger("GoWebExample")
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		slog.Debug("RequestURI: %v", r.RequestURI)
-		w.Write([]byte(r.RequestURI))
-	})
+	log.SetStdLogger("GoWebExample")
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	option := server.ParseOption()
+	server.InitConfig(option.Mode)
+
+	log.Debugfln("Mode: %s", server.GetMode())
+
+	appHandler := handler.NewAppHandler("./client/templates", "./client", "./client/messages")
+	appHandler.AppendStaticPrefix("images")
+	http.Handle("/", appHandler)
+
+	log.Fatalln(http.ListenAndServe(":8080", nil))
 }
