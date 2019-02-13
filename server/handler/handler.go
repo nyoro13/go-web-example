@@ -2,9 +2,8 @@ package handler
 
 import (
 	"encoding/json"
-	"go-web-example/server/log"
+	"go-web-example/server/file"
 	"go-web-example/server/util/slice"
-	"io/ioutil"
 	"net/http"
 	"strings"
 )
@@ -14,7 +13,7 @@ type AppHandler struct {
 	staticDir      string
 	messageDir     string
 	staticPrefixes []string
-	fileCache      map[string][]byte
+	fileReader     file.FileReader
 }
 
 func NewAppHandler(templateDir string, staticDir string, messageDir string) *AppHandler {
@@ -23,7 +22,7 @@ func NewAppHandler(templateDir string, staticDir string, messageDir string) *App
 	handler.staticDir = staticDir
 	handler.messageDir = messageDir
 	handler.staticPrefixes = make([]string, 3)
-	handler.fileCache = make(map[string][]byte)
+	handler.fileReader = file.MakeFileReader()
 
 	return handler
 }
@@ -34,18 +33,18 @@ func (app *AppHandler) AppendStaticPrefix(prefix string) {
 
 func (app AppHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
 	paths := strings.Split(request.URL.Path, "/")[1:]
+
 	if paths[len(paths)-1] == "" {
 		paths[len(paths)-1] = "index.html"
 	}
 
 	if app.isStaticPath(paths[0]) {
-		template, err := app.getTemplate(app.staticDir + request.URL.Path)
+		template, err := app.fileReader.Read(app.staticDir + request.URL.Path)
 		if err != nil {
 			response.WriteHeader(404)
 			response.Write([]byte("Not Found!!!"))
 			return
 		}
-
 		response.Write(template)
 		return
 	}
@@ -55,7 +54,7 @@ func (app AppHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 		paths[len(paths)-1] = filename[:len(filename)-5]
 	}
 
-	messageBin, err := app.getTemplate(app.messageDir + "/" + strings.Join(paths, "/") + "-en.json")
+	messageBin, err := app.fileReader.Read(app.messageDir + "/" + strings.Join(paths, "/") + "-en.json")
 	if err != nil {
 		response.WriteHeader(404)
 		response.Write([]byte("Not Found!!!"))
@@ -69,26 +68,9 @@ func (app AppHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	log.Debugfln("%v", message)
-
 	response.Write([]byte("Hoge"))
 }
 
 func (app *AppHandler) isStaticPath(firstPath string) bool {
 	return slice.Contains(app.staticPrefixes, firstPath)
-}
-
-func (app *AppHandler) getTemplate(path string) ([]byte, error) {
-	template, ok := app.fileCache[path]
-	if ok {
-		return template, nil
-	}
-
-	template, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	app.fileCache[path] = template
-	return template, nil
 }

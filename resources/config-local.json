@@ -1,3 +1,6 @@
 {
-  "mode": "local"
+  "Mode": "local",
+  "StaticDir": "./client",
+  "TemplateDir": "./client/templates",
+  "MessageDir": "./client/messages"
 }

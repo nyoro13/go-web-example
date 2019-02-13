@@ -8,7 +8,10 @@ import (
 )
 
 type Config struct {
-	mode string
+	Mode        string
+	StaticDir   string
+	TemplateDir string
+	MessageDir  string
 }
 
 var config Config
@@ -27,5 +30,17 @@ func InitConfig(mode string) {
 }
 
 func GetMode() string {
-	return config.mode
+	return config.Mode
+}
+
+func GetStaticDir() string {
+	return config.StaticDir
+}
+
+func GetTemplateDir() string {
+	return config.TemplateDir
+}
+
+func GetMessageDir() string {
+	return config.MessageDir
 }

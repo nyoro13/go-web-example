@@ -15,7 +15,7 @@ func main() {
 
 	log.Debugfln("Mode: %s", server.GetMode())
 
-	appHandler := handler.NewAppHandler("./client/templates", "./client", "./client/messages")
+	appHandler := handler.NewAppHandler(server.GetTemplateDir(), server.GetStaticDir(), server.GetMessageDir())
 	appHandler.AppendStaticPrefix("images")
 	http.Handle("/", appHandler)
 
