@@ -26,5 +26,8 @@ func main() {
 	http.HandleFunc("/scripts/", staticHandler.Handle)
 	http.HandleFunc("/styles/", staticHandler.Handle)
 
+	tempateHandler := handler.MakeTemplateHandler(server.GetTemplateDir())
+	http.HandleFunc("/", tempateHandler.Handle)
+
 	log.Fatalln(http.ListenAndServe(":8080", nil))
 }
