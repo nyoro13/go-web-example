@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"go-web-example/server/log"
 	"html/template"
 	"io/ioutil"
 	"net/http"
@@ -75,6 +76,8 @@ func MakeTemplateHandler(templateDir string, messageDir string) TemplateHandler 
 	return TemplateHandler{
 		templateDir: templateDir,
 		messageDir:  messageDir,
+		template:    nil,
+		messages:    make(map[Lang]interface{}),
 	}
 }
 
@@ -88,32 +91,39 @@ func (handler *TemplateHandler) Handle(responseWriter http.ResponseWriter, reque
 		}
 	}
 
+	log.Debugfln(lang.String())
 	message, ok := handler.messages[lang]
 	if !ok {
 		message = handler.getMessage(basePath, lang)
 		handler.messages[lang] = message
 	}
 
-	handler.template.ExecuteTemplate(responseWriter, basePath, message)
+	handler.template.ExecuteTemplate(responseWriter, handler.template.Name(), message)
+	//handler.template.Execute(responseWriter, message)
 }
 
 func (handler *TemplateHandler) getTemplate(basePath string) *template.Template {
-	return template.Must(template.ParseFiles(handler.templateDir + basePath))
+	templatePath := handler.templateDir + basePath
+	if strings.HasSuffix(templatePath, ".html") {
+		templatePath = templatePath[:len(templatePath)-5] + ".tmpl"
+	}
+	log.Debugfln(templatePath)
+	return template.Must(template.ParseFiles(templatePath))
 }
 
 func (handler *TemplateHandler) getMessage(basePath string, lang Lang) interface{} {
-	var messagePath string
-	if strings.HasSuffix(basePath, ".html") {
-		messagePath = basePath[:len(basePath)-5]
+	messagePath := handler.messageDir + basePath
+	if strings.HasSuffix(messagePath, ".html") {
+		messagePath = messagePath[:len(messagePath)-5]
 	}
 	messagePath += "-" + lang.String() + ".json"
+	log.Debugfln(messagePath)
 	messageJSON, err := ioutil.ReadFile(messagePath)
 	if err != nil {
 		handler.messages[lang] = nil
 	}
 
-	// TODO 型指定できないやんか
-	var hoge interface{}
-	err = json.Unmarshal(messageJSON, &hoge)
-	return hoge
+	var message interface{}
+	err = json.Unmarshal(messageJSON, &message)
+	return message
 }

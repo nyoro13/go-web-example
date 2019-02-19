@@ -15,19 +15,18 @@ func main() {
 
 	log.Debugfln("Mode: %s", server.GetMode())
 
-	/*
-	appHandler := handler.NewAppHandler(server.GetTemplateDir(), server.GetStaticDir(), server.GetMessageDir())
-	appHandler.AppendStaticPrefix("images")
-	http.Handle("/", appHandler)
-	*/
-
 	staticHandler := handler.MakeStaticHandler(server.GetStaticDir())
 	http.HandleFunc("/images/", staticHandler.Handle)
 	http.HandleFunc("/scripts/", staticHandler.Handle)
 	http.HandleFunc("/styles/", staticHandler.Handle)
+	http.HandleFunc("/favicon.ico", staticHandler.Handle)
 
-	tempateHandler := handler.MakeTemplateHandler(server.GetTemplateDir())
-	http.HandleFunc("/", tempateHandler.Handle)
+	topHandler := handler.MakeTemplateHandler(server.GetTemplateDir(), server.GetMessageDir())
+	hogeHandler := handler.MakeTemplateHandler(server.GetTemplateDir(), server.GetMessageDir())
+	http.HandleFunc("/ja/hoge/", hogeHandler.Handle)
+	http.HandleFunc("/hoge/", hogeHandler.Handle)
+	http.HandleFunc("/ja/", topHandler.Handle)
+	http.HandleFunc("/", topHandler.Handle)
 
 	log.Fatalln(http.ListenAndServe(":8080", nil))
 }
