@@ -1,74 +1,146 @@
 package file
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
 	"io/ioutil"
+	"sort"
+	"sync"
+	"time"
 )
 
+type FileReadingInfo struct {
+	lastRead time.Time
+	path     string
+	body     []byte
+}
+
+func newFileReadingInfo(filePath string, body []byte) *FileReadingInfo {
+	return &FileReadingInfo{
+		lastRead: time.Now(),
+		path:     filePath,
+		body:     body,
+	}
+}
+
+func (info *FileReadingInfo) touch() {
+	info.lastRead = time.Now()
+}
+
+func (info *FileReadingInfo) getSize() int {
+	return len(info.body)
+}
+
 type FileReader struct {
-	cache map[string][]byte
+	//cache map[string][]byte
+	cache sync.Map
+	mutex sync.Mutex
+	limit uint
 }
 
-func NewFileReader() *FileReader {
-	return &FileReader{cache: make(map[string][]byte)}
-}
-
-func MakeFileReader() FileReader {
-	return FileReader{cache: make(map[string][]byte)}
-}
-
-func (cacher *FileReader) Read(path string) ([]byte, error) {
-	data, err := cacher.getCache(path)
-	if err == nil {
-		return data, nil
+func NewFileReader(limit uint) *FileReader {
+	return &FileReader{
+		cache: sync.Map{},
+		mutex: sync.Mutex{},
+		limit: limit,
 	}
-
-	return cacher.readFromFile(path)
 }
 
-func (cacher *FileReader) Clear() {
-	// for now
-	cacher.cache = make(map[string][]byte)
+func MakeFileReader(limit uint) FileReader {
+	return *NewFileReader(limit)
 }
 
-func (cacher *FileReader) Delete(path string) {
-	delete(cacher.cache, makePathHash(path))
-}
-
-func (cacher *FileReader) readFromFile(path string) ([]byte, error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	cacher.putCache(path, &data)
-	return data, nil
-}
-
-func (cacher *FileReader) getCache(path string) ([]byte, error) {
-	if cacher.cache == nil {
-		cacher.cache = make(map[string][]byte)
-	}
-	data, ok := cacher.cache[makePathHash(path)]
+func (reader *FileReader) Read(filePath string) ([]byte, error) {
+	info, ok := reader.getCache(filePath)
 	if !ok {
-		return nil, fmt.Errorf("Not Found Cache. %s", path)
+		body, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			return nil, err
+		}
+		info = reader.putCache(filePath, body)
 	}
 
-	return data, nil
+	return info.body, nil
 }
 
-func (cacher *FileReader) putCache(path string, data *[]byte) {
-	hash := makePathHash(path)
-	if cacher.cache == nil {
-		cacher.cache = make(map[string][]byte)
+func (reader *FileReader) getCache(filePath string) (*FileReadingInfo, bool) {
+	raw, ok := reader.cache.Load(filePath)
+	if ok {
+		return raw.(*FileReadingInfo), true
+	} else {
+		return nil, false
+	}
+}
+
+func (reader *FileReader) putCache(filePath string, body []byte) *FileReadingInfo {
+	info := newFileReadingInfo(filePath, body)
+	reader.cache.Store(filePath, info)
+
+	reader.gcCache()
+
+	return info
+}
+
+func (reader *FileReader) gcCache() {
+	reader.mutex.Lock()
+	defer reader.mutex.Unlock()
+
+	if reader.limit == 0 || reader.limit >= reader.getCacheSize() {
+		return
 	}
 
-	cacher.cache[hash] = *data
+	reader.gcCacheNoLock()
 }
 
-func makePathHash(path string) string {
-	hash := sha256.Sum256([]byte(path))
-	return hex.EncodeToString(hash[:])
+func (reader *FileReader) gcCacheNoLock() {
+	if reader.limit == 0 || reader.limit >= reader.getCacheSize() {
+		return
+	}
+
+	reader.removeCache(reader.countCache()/2 + 1)
+	reader.gcCacheNoLock()
+}
+
+func (reader *FileReader) removeCache(count int) {
+	if count <= 0 {
+		return
+	}
+
+	cacheCount := reader.countCache()
+	if count >= cacheCount {
+		reader.cache = sync.Map{}
+		return
+	}
+
+	files := make([]*FileReadingInfo, cacheCount)
+	idx := 0
+	reader.cache.Range(func(_, value interface{}) bool {
+		files[idx] = value.(*FileReadingInfo)
+		idx++
+		return true
+	})
+
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].lastRead.Before(files[j].lastRead)
+	})
+
+	for i := 0; i < count; i++ {
+		reader.cache.Delete(files[i].path)
+	}
+}
+
+func (reader *FileReader) countCache() int {
+	count := 0
+	reader.cache.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+	return count
+}
+
+func (reader *FileReader) getCacheSize() uint {
+	var size uint
+	reader.cache.Range(func(_, v interface{}) bool {
+		size += uint(v.(*FileReadingInfo).getSize())
+		return true
+	})
+	return size
 }
